@@ -4,6 +4,9 @@ require("dotenv").config();
 
 const db = require("./config/db");
 const plantRoutes = require("./routes/plantRoutes");
+const alertRoutes = require("./routes/alertRoutes");
+const maintenanceRoutes = require("./routes/maintenanceRoutes");
+const waterQualityRoutes = require("./routes/waterQualityRoutes");
 
 const app = express();
 
@@ -24,6 +27,9 @@ app.get("/health", (req, res) => {
 });
 
 app.use("/api/plants", plantRoutes);
+app.use("/api/alerts", alertRoutes);
+app.use("/api/maintenance", maintenanceRoutes);
+app.use("/api/water-quality", waterQualityRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
@@ -52,7 +58,10 @@ async function startServer() {
       console.log(`Server running on http://localhost:${PORT}`);
       console.log(`  Root:   http://localhost:${PORT}/`);
       console.log(`  Health: http://localhost:${PORT}/health`);
-      console.log(`  Plants: http://localhost:${PORT}/api/plants`);
+      console.log(`  Plants:         http://localhost:${PORT}/api/plants`);
+      console.log(`  Alerts:         http://localhost:${PORT}/api/alerts`);
+      console.log(`  Maintenance:    http://localhost:${PORT}/api/maintenance`);
+      console.log(`  Water Quality:  http://localhost:${PORT}/api/water-quality`);
     });
 
     server.on("error", (err) => {
