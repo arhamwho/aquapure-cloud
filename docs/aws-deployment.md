@@ -1,29 +1,167 @@
 # AquaPure Cloud AWS Deployment
 
-**Project:** AquaPure Water Treatment Cloud  
+**Project:** AquaPure Water Treatment Management System  
 **Document Type:** AWS Deployment Guide  
-**Version:** 1.0  
-**Prepared For:** Academic Submission & AWS Case Study Evaluation
+**Version:** 2.0  
+**Prepared For:** Academic Submission & Viva Evaluation
 
 ---
 
 ## Overview
 
-This document describes the AWS deployment strategy for **AquaPure Water Treatment Cloud**, including EC2 hosting, Docker containerization, database setup, storage, security, and monitoring configuration.
+This document describes the AWS deployment strategy for **AquaPure Water Treatment Management System**, including EC2 hosting, Docker containerization, NGINX reverse proxy, database setup, automation, security, and monitoring configuration.
 
-**AquaPure Stack:**
+**AquaPure Stack (Deployed):**
 
 | Layer | Technology |
 |---|---|
 | Frontend | React + Vite |
 | Backend | Node.js + Express |
-| Database | MySQL |
+| Database | MySQL (host-based on EC2) |
 | Containerization | Docker + Docker Compose |
-| Cloud Platform | Amazon Web Services (AWS) |
+| Reverse Proxy | NGINX (port 80) |
+| Cloud Platform | Amazon EC2 |
+| Version Control | Git + GitHub |
+
+---
+
+## Deployment and Infrastructure
+
+### AWS EC2 Deployment
+
+| Setting | Value |
+|---|---|
+| Service | Amazon EC2 |
+| Region | ap-south-1 (Mumbai) |
+| Operating System | **Ubuntu 26.04 LTS** |
+| Instance Type | t3.micro / t3.medium |
+| Public IPv4 | 13.201.74.168 |
+| Private IP | 172.31.6.206 |
+| SSH User | ubuntu |
+| SSH Key | aquapure-key.pem |
+
+### Ubuntu 26.04 LTS
+
+The deployment instance runs Ubuntu 26.04 LTS (codename: Resolute). Package management uses `apt`:
+
+```bash
+sudo apt update
+sudo apt install -y git docker.io docker-compose-plugin nginx
+```
+
+### Docker
+
+Docker Engine runs AquaPure containers on EC2:
+
+```bash
+sudo systemctl enable docker
+sudo systemctl start docker
+sudo usermod -aG docker ubuntu
+docker --version
+```
+
+### Docker Compose
+
+Orchestrates frontend and backend services:
+
+```bash
+docker compose build
+docker compose up -d
+docker compose ps
+```
+
+| Container | Port |
+|---|---|
+| aquapure-frontend | 5173 |
+| aquapure-backend | 5001 |
+
+### NGINX
+
+NGINX reverse proxy on port 80 routes public traffic:
+
+| Path | Target |
+|---|---|
+| `/` | Frontend (127.0.0.1:5173) |
+| `/api/*` | Backend (127.0.0.1:5001) |
+| `/health` | Backend health check |
+
+Configuration: `nginx/aquapure.conf`
+
+```bash
+sudo cp nginx/aquapure.conf /etc/nginx/sites-available/aquapure
+sudo ln -sf /etc/nginx/sites-available/aquapure /etc/nginx/sites-enabled/aquapure
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### GitHub
+
+Source code repository:
+
+- **URL:** https://github.com/arhamwho/aquapure-cloud
+- **Branch:** main
+- **Clone:** `git clone https://github.com/arhamwho/aquapure-cloud.git`
+
+### Cron Jobs
+
+Automated daily backup on EC2:
+
+```bash
+crontab -e
+```
+
+```cron
+0 2 * * * /home/ubuntu/aquapure-cloud/scripts/backup.sh >> /home/ubuntu/cron.log 2>&1
+```
+
+### SCP Secure File Transfer
+
+Transfer configuration files securely to EC2:
+
+```bash
+scp -i ~/Downloads/aquapure-key.pem nginx/aquapure.conf ubuntu@13.201.74.168:~/aquapure-cloud/nginx/
+scp -i ~/Downloads/aquapure-key.pem backend/.env ubuntu@13.201.74.168:~/aquapure-cloud/backend/
+```
+
+### Security Groups
+
+| Type | Port | Source | Purpose |
+|---|---|---|---|
+| Inbound SSH | 22 | Admin IP | EC2 administration |
+| Inbound HTTP | 80 | 0.0.0.0/0 | Public web access |
+| Inbound HTTPS | 443 | 0.0.0.0/0 | Future SSL |
+| Outbound | All | 0.0.0.0/0 | Updates, Git, packages |
+
+### Public IPv4 Deployment
+
+Application accessible at:
+
+- Dashboard: `http://13.201.74.168/`
+- Health: `http://13.201.74.168/health`
+- API: `http://13.201.74.168/api/plants`
 
 ---
 
 ## Deployment Architecture
+
+### Current Deployment (Implemented)
+
+```text
+Internet
+   │
+   ▼
+Public IPv4 (13.201.74.168)
+   │
+   ▼
+NGINX (:80)
+   │
+   ├── /     → aquapure-frontend (:5173)
+   └── /api  → aquapure-backend (:5001)
+                    │
+                    ▼
+               MySQL (host)
+```
+
+### Production Extension (Documented)
 
 ```text
 Internet
@@ -32,59 +170,119 @@ Internet
 Application Load Balancer
    │
    ▼
-EC2 Instance (Docker Host)
+EC2 Instance(s)
    │
-   ├── aquapure-frontend :5173
-   └── aquapure-backend  :5001
-           │
-           ▼
-      Amazon RDS MySQL
-           │
-           ▼
-      Amazon S3 Backups
-           │
-           ▼
-      Amazon CloudWatch
+   ├── NGINX → Frontend + Backend containers
+   │
+   ▼
+Amazon RDS MySQL
+   │
+   ▼
+Amazon S3 Backups + CloudWatch
 ```
 
 ---
 
-## EC2 Deployment
+## Deployment Procedure
 
-Amazon EC2 hosts the AquaPure application in a Linux-based cloud server environment.
+### Step 1 — Launch EC2
 
-### Recommended Configuration
+Launch Ubuntu 26.04 LTS instance with public IPv4 in ap-south-1.
 
-| Setting | Value |
-|---|---|
-| Instance Type | `t3.medium` |
-| Operating System | Ubuntu 22.04 LTS |
-| Storage | 30 GB gp3 |
-| Region | `ap-south-1` |
+### Step 2 — Configure Security Groups
 
-### EC2 Setup Steps
+Allow SSH (22) and HTTP (80).
+
+### Step 3 — Generate SSH Key Pair
+
+Download `aquapure-key.pem` and set permissions:
+
+```bash
+chmod 400 ~/Downloads/aquapure-key.pem
+```
+
+### Step 4 — Connect via SSH
+
+```bash
+ssh -i ~/Downloads/aquapure-key.pem ubuntu@13.201.74.168
+```
+
+### Step 5 — Install Docker
 
 ```bash
 sudo apt update
-sudo apt install -y git docker.io docker-compose-plugin
+sudo apt install -y docker.io
 sudo usermod -aG docker ubuntu
-git clone https://github.com/arhamwho/aquapure-cloud.git
-cd aquapure-cloud
-./scripts/deploy.sh
 ```
 
-### EC2 Responsibilities
+### Step 6 — Install Docker Compose
 
-- Host Docker containers
-- Run deployment scripts
-- Execute backup and monitoring scripts
-- Provide compute for frontend and backend services
+```bash
+sudo apt install -y docker-compose-plugin
+docker compose version
+```
+
+### Step 7 — Clone Repository
+
+```bash
+git clone https://github.com/arhamwho/aquapure-cloud.git
+cd aquapure-cloud
+```
+
+### Step 8 — Run Docker Compose
+
+```bash
+docker compose build
+docker compose up -d
+```
+
+### Step 9 — Verify Containers
+
+```bash
+sudo docker ps
+curl http://localhost:5001/health
+```
+
+### Step 10 — Configure NGINX
+
+```bash
+sudo apt install -y nginx
+sudo cp nginx/aquapure.conf /etc/nginx/sites-available/aquapure
+sudo ln -sf /etc/nginx/sites-available/aquapure /etc/nginx/sites-enabled/aquapure
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### Step 11 — Configure Cron Jobs
+
+```bash
+crontab -e
+# Add: 0 2 * * * /home/ubuntu/aquapure-cloud/scripts/backup.sh >> /home/ubuntu/cron.log 2>&1
+```
+
+---
+
+## Deployment Verification
+
+See `docs/deployment-evidence.md` for complete figure gallery.
+
+| Figure | Description |
+|---|---|
+| Figure 1 | AWS EC2 Instance Running |
+| Figure 2 | Security Group Configuration |
+| Figure 3 | Docker Installation Verification |
+| Figure 4 | Docker Compose Configuration |
+| Figure 5 | Application Running After Deployment |
+| Figure 6 | NGINX Service Running |
+| Figure 7 | Cron Job Configuration |
+| Figure 8 | SCP File Transfer |
+| Figure 9 | GitHub / Project Repository |
+| Figure 10 | System Architecture Diagram |
+| Figure 11 | AWS Architecture Diagram |
 
 ---
 
 ## Docker Deployment
-
-AquaPure uses Docker to containerize the frontend and backend for consistent deployment.
 
 ### Docker Compose Services
 
@@ -93,146 +291,68 @@ AquaPure uses Docker to containerize the frontend and backend for consistent dep
 | Backend | `aquapure-backend` | 5001 |
 | Frontend | `aquapure-frontend` | 5173 |
 
-### Deployment Commands
+### Deployment Script
 
 ```bash
-docker compose build
-docker compose up -d
-docker compose ps
+./scripts/deploy.sh
 ```
 
-### Docker Architecture
-
-```text
-EC2 Host
-   │
-   ├── frontend container
-   │      └── React + Vite dashboard
-   │
-   └── backend container
-          └── Express API + MySQL connection
-```
-
-### Docker Benefits for AquaPure
-
-- Consistent development and production environments
-- Simplified deployment using `deploy.sh`
-- Isolated frontend and backend services
-- Easy scaling to multiple EC2 instances
+Automates: git pull → npm install → docker compose build → docker compose up -d
 
 ---
 
-## Security Groups
-
-Security Groups act as virtual firewalls for AquaPure AWS resources.
-
-### Load Balancer Security Group
-
-| Type | Port | Source | Purpose |
-|---|---|---|---|
-| Inbound | 80 | 0.0.0.0/0 | HTTP access |
-| Inbound | 443 | 0.0.0.0/0 | HTTPS access |
-| Outbound | 5001 | EC2 SG | Forward API traffic |
-| Outbound | 5173 | EC2 SG | Forward frontend traffic |
+## Security Groups (Detailed)
 
 ### EC2 Security Group
 
 | Type | Port | Source | Purpose |
 |---|---|---|---|
 | Inbound | 22 | Admin IP | SSH administration |
-| Inbound | 5001 | Load Balancer SG | Backend API |
-| Inbound | 5173 | Load Balancer SG | Frontend access |
-| Outbound | 3306 | RDS SG | Database connection |
-| Outbound | 443 | 0.0.0.0/0 | Updates and external services |
+| Inbound | 80 | 0.0.0.0/0 | HTTP via NGINX |
+| Outbound | 443 | 0.0.0.0/0 | Package updates |
 
-### RDS Security Group
+### RDS Security Group (Production Extension)
 
 | Type | Port | Source | Purpose |
 |---|---|---|---|
 | Inbound | 3306 | EC2 SG | Backend database access |
-| Outbound | All | Restricted | No public database access |
 
 ---
 
-## RDS Setup
-
-Amazon RDS hosts the AquaPure MySQL database.
-
-### RDS Configuration
+## RDS Setup (Production Extension)
 
 | Setting | Value |
 |---|---|
 | Engine | MySQL 8.0 |
-| Instance Class | `db.t3.micro` |
-| Database Name | `aquapure` |
-| Multi-AZ | Optional for production |
+| Instance Class | db.t3.micro |
+| Database Name | aquapure |
 | Public Access | Disabled |
-
-### Database Schema
-
-```sql
-CREATE DATABASE aquapure;
-USE aquapure;
-```
-
-**Tables:**
-
-- `plants`
-- `users`
-- `alerts`
-- `maintenance_logs`
-- `water_quality`
 
 ### Backend Environment Variables
 
 ```env
 PORT=5001
-DB_HOST=aquapure-db.xxxxx.ap-south-1.rds.amazonaws.com
-DB_USER=admin
-DB_PASSWORD=secure_password
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=
 DB_NAME=aquapure
 ```
 
-### RDS Connection Flow
+For RDS:
 
-```text
-Backend Container
-      │
-      ▼
-Port 3306
-      │
-      ▼
-Amazon RDS MySQL
-      │
-      ▼
-AquaPure Tables
+```env
+DB_HOST=aquapure-db.xxxxx.ap-south-1.rds.amazonaws.com
 ```
 
 ---
 
-## S3 Setup
-
-Amazon S3 stores AquaPure backup files and exported reports.
-
-### S3 Bucket Configuration
+## S3 Setup (Production Extension)
 
 | Setting | Value |
 |---|---|
-| Bucket Name | `aquapure-backups` |
+| Bucket Name | aquapure-backups |
 | Versioning | Enabled |
-| Encryption | SSE-S3 or SSE-KMS |
 | Public Access | Blocked |
-
-### Folder Structure
-
-```text
-aquapure-backups/
-   ├── database/
-   ├── reports/
-   └── logs/
-```
-
-### Backup Upload Example
 
 ```bash
 aws s3 cp backups/aquapure_20260615.sql s3://aquapure-backups/database/
@@ -240,112 +360,13 @@ aws s3 cp backups/aquapure_20260615.sql s3://aquapure-backups/database/
 
 ---
 
-## CloudWatch Setup
+## CloudWatch Setup (Production Extension)
 
-Amazon CloudWatch monitors AquaPure infrastructure and application health.
-
-### Metrics to Monitor
-
-| Metric | Source |
-|---|---|
-| CPU Utilization | EC2 |
-| Memory Usage | EC2 / Custom metrics |
-| Disk Usage | EC2 |
-| Network Traffic | EC2 / ALB |
-| RDS Connections | RDS |
-| API Errors | Application logs |
-
-### CloudWatch Architecture
-
-```text
-AquaPure Services
-      │
-      ├── EC2 Metrics
-      ├── RDS Metrics
-      ├── Container Logs
-      └── Custom Application Metrics
-              │
-              ▼
-        Amazon CloudWatch
-              │
-              ├── Dashboards
-              ├── Alarms
-              └── Logs
-```
-
-### Useful Commands
+Monitor EC2 CPU, memory, disk, container logs, and `/health` endpoint availability.
 
 ```bash
 docker logs aquapure-backend
-docker logs aquapure-frontend
 ./scripts/monitor.sh
-```
-
-### Recommended Alarms
-
-| Alarm | Threshold |
-|---|---|
-| High CPU | > 80% for 5 minutes |
-| High Memory | > 85% |
-| Low Disk Space | < 20% free |
-| RDS Storage | > 80% used |
-| Backend Health Check Failure | `/health` unavailable |
-
----
-
-## Monitoring Strategy
-
-AquaPure uses a combined monitoring strategy across application and AWS infrastructure layers.
-
-### Application Monitoring
-
-| Component | Method |
-|---|---|
-| Backend Health | `GET /health` |
-| API Availability | `/api/plants`, `/api/alerts`, etc. |
-| Dashboard Access | Frontend URL availability |
-| Database Connectivity | Backend startup logs |
-
-### Infrastructure Monitoring
-
-| Component | Method |
-|---|---|
-| CPU / Memory / Disk | CloudWatch + `monitor.sh` |
-| Docker Containers | `docker compose ps` |
-| Logs | `docker logs` and CloudWatch Logs |
-| Alarms | CloudWatch Alarm notifications |
-
-### Monitoring Workflow
-
-```text
-System Metrics
-      │
-      ▼
-CloudWatch / monitor.sh
-      │
-      ▼
-Threshold Evaluation
-      │
-      ├── Normal → Continue Monitoring
-      └── Alert → Admin Notification / Auto Recovery
-```
-
----
-
-## Deployment Workflow
-
-```text
-1. Launch EC2 Instance
-2. Install Docker and Git
-3. Clone AquaPure Repository
-4. Configure Environment Variables
-5. Launch RDS MySQL Instance
-6. Create S3 Backup Bucket
-7. Configure Security Groups
-8. Run deploy.sh
-9. Verify /health and Dashboard
-10. Enable CloudWatch Monitoring
-11. Schedule backup.sh using cron
 ```
 
 ---
@@ -357,19 +378,18 @@ Threshold Evaluation
 | Backend Health | `{"status":"healthy"}` |
 | Plants API | Returns plant records |
 | Alerts API | Returns alert records |
-| Maintenance API | Returns maintenance logs |
-| Water Quality API | Returns quality records |
-| Frontend Dashboard | Loads KPI cards and modules |
+| Frontend Dashboard | Loads KPI cards |
 | Docker Status | Both containers running |
-| RDS Connection | Backend connects successfully |
+| NGINX Status | active (running) |
+| Cron Job | Listed in crontab -l |
 
 ---
 
 ## Conclusion
 
-The AWS deployment strategy for **AquaPure Water Treatment Cloud** provides a secure, scalable, and monitorable cloud environment. Through EC2 hosting, Docker containerization, RDS database management, S3 backup storage, CloudWatch monitoring, and properly configured security groups, AquaPure is ready for academic case study evaluation and production-style cloud deployment.
+The AWS deployment strategy for **AquaPure Water Treatment Management System** provides a secure, documented, and verifiable cloud environment. Through EC2 hosting on Ubuntu 26.04 LTS, Docker containerization, NGINX reverse proxy, cron automation, GitHub version control, and SCP file transfer, AquaPure is ready for academic submission and viva evaluation.
 
-This deployment model supports all completed AquaPure modules including Dashboard, Plants, Alerts, Maintenance, Water Quality, Reports, Monitoring, Pricing, Architecture, and RBAC Demo functionality.
+For the complete report, see `docs/final-report.md`.
 
 ---
 

@@ -2,8 +2,8 @@
 
 **Project:** AquaPure Water Treatment Cloud  
 **Document Type:** AWS Cost Estimation & Optimization Guide  
-**Version:** 1.0  
-**Prepared For:** Academic Submission & AWS Case Study Evaluation
+**Version:** 2.0  
+**Prepared For:** Academic Submission & Viva Evaluation
 
 ---
 

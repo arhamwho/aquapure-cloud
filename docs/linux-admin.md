@@ -2,8 +2,8 @@
 
 **Project:** AquaPure Water Treatment Cloud  
 **Document Type:** Linux Administration Reference  
-**Version:** 1.0  
-**Prepared For:** Academic Submission & AWS Case Study Evaluation
+**Version:** 2.0  
+**Prepared For:** Academic Submission & Viva Evaluation
 
 ---
 
@@ -627,13 +627,14 @@ Linux administration is applied throughout the AquaPure Water Treatment Cloud in
 
 ### EC2 Servers
 
-Amazon EC2 instances run Linux operating systems that host:
+Amazon EC2 instances run **Ubuntu 26.04 LTS** and host:
 
-- Docker Engine
+- Docker Engine and Docker Compose
+- NGINX reverse proxy (port 80)
 - AquaPure backend and frontend containers
 - Deployment scripts
 - Monitoring utilities
-- Scheduled backup jobs
+- Scheduled backup jobs via cron
 
 Administrators use Linux commands to manage users, monitor resources, inspect logs, and maintain server health.
 
@@ -709,6 +710,34 @@ Backup operations protect AquaPure data against loss. Linux administration enabl
 ```
 
 This aligns with AWS disaster recovery practices using **Amazon S3** and **AWS Backup** in production environments.
+
+---
+
+## SCP Secure File Transfer
+
+**SCP (Secure Copy Protocol)** transfers files between local machines and EC2 over SSH.
+
+### Transfer NGINX Configuration
+
+```bash
+scp -i ~/Downloads/aquapure-key.pem nginx/aquapure.conf ubuntu@13.201.74.168:~/aquapure-cloud/nginx/
+```
+
+### Transfer Environment File
+
+```bash
+scp -i ~/Downloads/aquapure-key.pem backend/.env ubuntu@13.201.74.168:~/aquapure-cloud/backend/
+```
+
+### Transfer SSH Key Permissions
+
+Before connecting or using SCP, secure the key file:
+
+```bash
+chmod 400 ~/Downloads/aquapure-key.pem
+```
+
+**Purpose:** SCP provides encrypted file transfer for deployment configuration without exposing credentials over unencrypted channels.
 
 ---
 

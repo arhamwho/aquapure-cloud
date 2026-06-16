@@ -2,8 +2,8 @@
 
 **Project:** AquaPure Water Treatment Cloud  
 **Document Type:** Cloud Networking Architecture Reference  
-**Version:** 1.0  
-**Prepared For:** Academic Submission & AWS Case Study Evaluation
+**Version:** 2.0  
+**Prepared For:** Academic Submission & Viva Evaluation
 
 ---
 
@@ -425,6 +425,34 @@ VPN access is recommended for production AquaPure deployments.
 | Deployment Role | Support CI/CD and automated deployment scripts |
 
 IAM roles support secure cloud operations while reducing credential management risk.
+
+---
+
+## Deployed EC2 Networking (Current Implementation)
+
+AquaPure is deployed on AWS EC2 with a **Public IPv4** address and NGINX reverse proxy:
+
+```text
+Internet User
+      │
+      ▼
+Public IPv4 (13.201.74.168:80)
+      │
+      ▼
+NGINX Reverse Proxy
+      ├── /      → Frontend container (:5173)
+      └── /api/* → Backend container (:5001)
+                      │
+                      ▼
+                 MySQL (localhost:3306)
+```
+
+| Component | Address | Access |
+|---|---|---|
+| Public Web | 13.201.74.168:80 | Internet |
+| SSH Admin | 13.201.74.168:22 | Admin IP only |
+| Backend (internal) | 127.0.0.1:5001 | Via NGINX |
+| Frontend (internal) | 127.0.0.1:5173 | Via NGINX |
 
 ---
 

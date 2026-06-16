@@ -2,8 +2,8 @@
 
 **Project:** AquaPure Water Treatment Cloud  
 **Document Type:** Operations Automation Reference  
-**Version:** 1.0  
-**Prepared For:** Academic Submission & AWS Case Study Evaluation
+**Version:** 2.0  
+**Prepared For:** Academic Submission & Viva Evaluation
 
 ---
 
@@ -166,11 +166,19 @@ This script supports the AquaPure **Monitoring Module** and aligns with Amazon C
 
 Cron jobs automate recurring administrative tasks on Linux and EC2 servers.
 
-### Example Cron Entry
+### Example Cron Entry (Production)
 
 ```bash
-0 2 * * * /home/ubuntu/AquaPure-Cloud/scripts/backup.sh
+0 2 * * * /home/ubuntu/aquapure-cloud/scripts/backup.sh >> /home/ubuntu/cron.log 2>&1
 ```
+
+### Verified EC2 Cron Entry (Deployment)
+
+```bash
+0 2 * * * echo "AquaPure Backup Job" >> /home/ubuntu/cron.log
+```
+
+This entry was configured on the deployment EC2 instance (`ubuntu@ip-172-31-6-206`) using `crontab -e`.
 
 ### Schedule Explanation
 
